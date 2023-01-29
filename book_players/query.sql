@@ -18,12 +18,13 @@ WITH
         idPlayer,
         count(distinct idLobbyGame) as qtyLobby,
         count(distinct date(dtCreatedAt)) as qtyDays,
+        min(julianday('2022-02-01') - julianday(dtCreatedAt)) as lobbyRecencyDays,
         count(distinct case when qtRoundsPlayed < 16 then idLobbyGame end) as qtyLobbyLess16,
         round(1.0 * count(distinct idLobbyGame) / count(distinct date(dtCreatedAt)), 4 )as avgLobbyDay,
         avg(qtKill) as avgqtyKill,
         avg(qtAssist) as avgqtyAssist,
         avg(qtDeath) as avgqtyDeath,
-        1.0*avg(qtKill/qtDeath) as avgKD,
+        avg(1.0*qtKill/qtDeath) as avgKD,
         1.0*sum(qtKill)/sum(qtDeath) as KDgeral,
         1.0*avg((qtKill + qtAssist )/ qtDeath) as avgKDA,
         1.0*(sum(qtKill + qtAssist)) / sum(qtDeath) as KDAgeral,
@@ -81,36 +82,89 @@ WITH
         count(distinct case when descMapName = "de_train" and flWinner = 1 then idLobbyGame end) as qtyWinsTrain,
         count(distinct case when descMapName = "de_overpass" then idLobbyGame end) as qtyLobbyOverpass,
         count(distinct case when descMapName = "de_overpass" and flWinner = 1 then idLobbyGame end) as qtyWinsOverpass
-
     FROM
         tb_lobby
-
     GROUP BY
         1
     )
 ,
-
     tb_current_lvl as (
     SELECT
         idPlayer,
         vlLevel
     FROM 
-    (
+        (
         SELECT
             idPlayer,
             vlLevel,
             row_number() over(partition by idPlayer order by dtCreatedAt desc) as rn
         FROM
-            tb_lobby)
+            tb_lobby
+        )
     WHERE
         rn = 1
     )
+,
+    tb_lobby_features as (
+    SELECT
+        t1.*,
+        t2.vlLevel as vlCurrentLevel
+    FROM
+        tb_stats as t1
+    left join tb_current_lvl as t2
+        on  t1.idPlayer = t2.idPlayer
+    )
+,
 
-SELECT
-    t1.*,
-    t2.vlLevel as vlCurrentLevel
-FROM
-    tb_stats as t1
-left JOIN
-    tb_current_lvl as t2
-on t1.idPlayer = t2.idPlayer
+    tb_medals as(
+    SELECT
+        *
+    FROM
+        tb_players_medalha as t1
+    LEFT JOIN
+        tb_medalha as t2
+    ON  t1.idMedal = t2.idMedal
+    WHERE
+        dtCreatedAt < dtExpiration AND
+        dtCreatedAt <= date('2022-02-01') AND
+        coalesce(dtRemove, dtExpiration) >= date('2022-02-01', '-30 day')
+
+    )
+,
+    tb_medals_features as (
+    SELECT
+        idPlayer,
+        count(distinct idMedal) as qtyDistinctMedals,
+        count(distinct case when dtCreatedAt >= date('2022-02-01', '-30 day') then id end) as qtyAcquiredMedals,
+        sum(distinct case when idMedal = 1 then 1 else 0 end) as qtyPremium,
+        sum(distinct case when idMedal = 3 then 1 else 0 end) as qtyPlus,
+        max(case when idMedal in (1, 3) AND 
+                      coalesce(dtRemove, dtExpiration) >= date('2022-02-01') then 1 else 0 end) as flActiveSubscription
+
+    FROM tb_medals
+    GROUP BY 1
+    )
+
+    SELECT
+        ('2022-02-01') as dtRef,
+        t1.*,
+        coalesce(t2.qtyDistinctMedals, 0) as qtyDistinctMedals,
+        coalesce(t2.qtyAcquiredMedals, 0) as qtyAcquiredMedals,
+        coalesce(t2.qtyPremium, 0) as qtyPremium,
+        coalesce(t2.qtyPlus, 0) as qtyPlus,
+        coalesce(t2.flActiveSubscription, 0) as flActiveSubscription,
+        t3.flFacebook,
+        t3.flTwitter,-
+        t3.flTwitch,
+        t3.descCountry,
+        (JulianDay('2022-02-01') - JulianDay(t3.dtBirth))/365.25 as playerAge,
+        (JulianDay('2022-02-01') - JulianDay(t3.dtRegistration)) as registrationDays
+    FROM
+        tb_lobby_features as t1
+    LEFT JOIN
+        tb_medals_features as t2
+    ON  t1.idPlayer = t2.idPlayer
+
+    LEFT JOIN
+        tb_players as t3
+    ON  t1.idPlayer = t3.idPlayer

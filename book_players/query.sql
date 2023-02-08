@@ -7,8 +7,8 @@ WITH
     FROM
         tb_lobby_stats_player
     WHERE
-        dtCreatedAt < date('2022-02-01') AND
-        dtCreatedAt > date('2022-02-01', '-30 day')     
+        dtCreatedAt < date('{date}') AND
+        dtCreatedAt > date('{date}', '-30 day')
     )
 ,
 
@@ -18,7 +18,7 @@ WITH
         idPlayer,
         count(distinct idLobbyGame) as qtyLobby,
         count(distinct date(dtCreatedAt)) as qtyDays,
-        min(julianday('2022-02-01') - julianday(dtCreatedAt)) as lobbyRecencyDays,
+        min(julianday('{date}') - julianday(dtCreatedAt)) as lobbyRecencyDays,
         count(distinct case when qtRoundsPlayed < 16 then idLobbyGame end) as qtyLobbyLess16,
         round(1.0 * count(distinct idLobbyGame) / count(distinct date(dtCreatedAt)), 4 )as avgLobbyDay,
         avg(qtKill) as avgqtyKill,
@@ -126,8 +126,8 @@ WITH
     ON  t1.idMedal = t2.idMedal
     WHERE
         dtCreatedAt < dtExpiration AND
-        dtCreatedAt <= date('2022-02-01') AND
-        coalesce(dtRemove, dtExpiration) >= date('2022-02-01', '-30 day')
+        dtCreatedAt <= date('{date}') AND
+        coalesce(dtRemove, dtExpiration) >= date('{date}', '-30 day')
 
     )
 ,
@@ -135,18 +135,20 @@ WITH
     SELECT
         idPlayer,
         count(distinct idMedal) as qtyDistinctMedals,
-        count(distinct case when dtCreatedAt >= date('2022-02-01', '-30 day') then id end) as qtyAcquiredMedals,
+        count(distinct case when dtCreatedAt >= date('{date}', '-30 day') then id end) as qtyAcquiredMedals,
         sum(distinct case when idMedal = 1 then 1 else 0 end) as qtyPremium,
         sum(distinct case when idMedal = 3 then 1 else 0 end) as qtyPlus,
         max(case when idMedal in (1, 3) AND 
-                      coalesce(dtRemove, dtExpiration) >= date('2022-02-01') then 1 else 0 end) as flActiveSubscription
+                      coalesce(dtRemove, dtExpiration) >= date('{date}') then 1 else 0 end) as flActiveSubscription
 
     FROM tb_medals
     GROUP BY 1
     )
 
+insert into tb_book_players
+
     SELECT
-        ('2022-02-01') as dtRef,
+        ('{date}') as dtRef,
         t1.*,
         coalesce(t2.qtyDistinctMedals, 0) as qtyDistinctMedals,
         coalesce(t2.qtyAcquiredMedals, 0) as qtyAcquiredMedals,
@@ -154,11 +156,11 @@ WITH
         coalesce(t2.qtyPlus, 0) as qtyPlus,
         coalesce(t2.flActiveSubscription, 0) as flActiveSubscription,
         t3.flFacebook,
-        t3.flTwitter,-
+        t3.flTwitter,
         t3.flTwitch,
         t3.descCountry,
-        (JulianDay('2022-02-01') - JulianDay(t3.dtBirth))/365.25 as playerAge,
-        (JulianDay('2022-02-01') - JulianDay(t3.dtRegistration)) as registrationDays
+        (JulianDay('{date}') - JulianDay(t3.dtBirth))/365.25 as playerAge,
+        (JulianDay('{date}') - JulianDay(t3.dtRegistration)) as registrationDays
     FROM
         tb_lobby_features as t1
     LEFT JOIN
@@ -167,4 +169,4 @@ WITH
 
     LEFT JOIN
         tb_players as t3
-    ON  t1.idPlayer = t3.idPlayer
+    ON  t1.idPlayer = t3.idPlayer;

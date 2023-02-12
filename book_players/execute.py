@@ -1,9 +1,9 @@
 # %%
 #imports
-from sqlalchemy import Table, MetaData
+from sqlalchemy import Table, MetaData, text
 from tqdm       import tqdm
 
-import sqlalchemy 
+import sqlalchemy
 import datetime
 import os
 
@@ -31,8 +31,6 @@ def import_query(path):
         query = open_file.read()
     return query
 
-
-
 def process_date(query, date_ingestion, engine):
     '''func that execute the query file based on a date of ingestions'''
     conn = engine.connect()
@@ -41,9 +39,13 @@ def process_date(query, date_ingestion, engine):
     #delete = tb_book_players.delete().where(tb_book_players.c.dtRef == date_ingestion)
     #conn.execute(delete)
 
-    query = query.format(date=date_ingestion)
-    conn.execute(query)
+    #delete in case of same data inputation (duplicated ingestions)
+    delete = f"delete from tb_book_players where dtRef = '{date_ingestion}'"
+    conn.execute(text(delete))
 
+    query = query.format(date=date_ingestion)
+    conn.execute(text(query))
+    conn.commit()
     conn.close()
  
 # %%
@@ -56,3 +58,12 @@ dt_start = input('Enter a start date: ')
 dt_end   = input('Enter a end date: ')
 
 backfill(query, engine, dt_start, dt_end)
+
+# %%
+#from sqlalchemy import create_engine
+#from sqlalchemy import inspect
+#import sqlalchemy
+#engine = sqlalchemy.create_engine('sqlite:///../data/gc.db')
+#insp = inspect(engine)
+#print(insp.get_table_names())
+# %%

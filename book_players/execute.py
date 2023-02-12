@@ -32,14 +32,10 @@ def import_query(path):
     return query
 
 def process_date(query, date_ingestion, engine):
-    '''func that execute the query file based on a date of ingestions'''
+    '''func that execute the query file based on dates of ingestions'''
     conn = engine.connect()
 
-    # delete in case of duplicated ingestions
-    #delete = tb_book_players.delete().where(tb_book_players.c.dtRef == date_ingestion)
-    #conn.execute(delete)
-
-    #delete in case of same data inputation (duplicated ingestions)
+    #delete in case of same data ingestions (duplicated ingestions)
     delete = f"delete from tb_book_players where dtRef = '{date_ingestion}'"
     conn.execute(text(delete))
 
@@ -52,18 +48,10 @@ def process_date(query, date_ingestion, engine):
 # conecting python with db
 engine = sqlalchemy.create_engine('sqlite:///../data/gc.db')
 
+#import query that will get the players stats from the last 30 days
 query = import_query('query.sql')
 
 dt_start = input('Enter a start date: ')
 dt_end   = input('Enter a end date: ')
 
 backfill(query, engine, dt_start, dt_end)
-
-# %%
-#from sqlalchemy import create_engine
-#from sqlalchemy import inspect
-#import sqlalchemy
-#engine = sqlalchemy.create_engine('sqlite:///../data/gc.db')
-#insp = inspect(engine)
-#print(insp.get_table_names())
-# %%
